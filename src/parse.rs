@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use failure::{self, Error};
 
 pub struct Parser<'a> {
@@ -20,6 +18,19 @@ impl<'a> Parser<'a> {
             b' ' | b'\t' | b'\r' => true,
             _ => false,
         }
+    }
+
+    fn is_ident_char(&self, ch: u8) -> bool {
+        ch == b'_'
+            || (b'a' <= ch && ch <= b'z')
+            || (b'A' <= ch && ch <= b'Z')
+            || (b'0' <= ch && ch <= b'9')
+    }
+
+    fn is_ident_start(&self, ch: u8) -> bool {
+        ch == b'_'
+            || (b'a' <= ch && ch <= b'z')
+            || (b'A' <= ch && ch <= b'Z')
     }
 
     #[inline(always)]
@@ -78,16 +89,14 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn check_keyword(&mut self, keyword: &[u8]) -> bool {
-        fn is_ident_char(ch: u8) -> bool {
-            ch == b'_'
-                || (b'a' <= ch && ch <= b'z')
-                || (b'A' <= ch && ch <= b'Z')
-                || (b'0' <= ch && ch <= b'9')
-        }
+    pub fn check_ident(&self) -> Option<&'a [u8]> {
+        self.check_matching(|ch| self.is_ident_char(ch))
+            .filter(|ident| self.is_ident_start(ident[0]))
+    }
 
+    pub fn check_keyword(&mut self, keyword: &[u8]) -> bool {
         let end = self.cursor + keyword.len();
-        self.check(keyword) && (end == self.source.len() || !is_ident_char(self.source[end]))
+        self.check(keyword) && (end == self.source.len() || !self.is_ident_char(self.source[end]))
     }
 
     pub fn skip(&mut self, next: &[u8]) -> bool {
@@ -104,6 +113,15 @@ impl<'a> Parser<'a> {
         F: Fn(u8) -> bool,
     {
         let result = self.check_matching(f);
+        if let Some(result) = result {
+            self.cursor += result.len();
+            self.skip_whitespace();
+        }
+        result
+    }
+
+    pub fn skip_ident(&mut self) -> Option<&'a [u8]> {
+        let result = self.check_ident();
         if let Some(result) = result {
             self.cursor += result.len();
             self.skip_whitespace();
@@ -131,6 +149,22 @@ impl<'a> Parser<'a> {
     #[inline(always)]
     pub fn expect(&mut self, next: &[u8]) -> Result<(), Error> {
         self.expect_with_fn(|parser| parser.skip(next))
+    }
+
+    #[inline(always)]
+    pub fn expect_ident(&mut self) -> Result<&'a [u8], Error> {
+        // TODO: Duplication
+        if self.finished() {
+            return Err(failure::err_msg(format!(
+                "Expected `{}` but reached the end of the file.",
+                "(TODO: Show correct expectation)"
+            )));
+        }
+
+        self.skip_ident().ok_or(failure::err_msg(format!(
+                "Expected `{}` but saw `{}`",
+                "(TODO: Show correct expectation)", "(TODO: Show what was found instead)",
+            )))
     }
 
     #[inline(always)]
@@ -189,21 +223,5 @@ impl<'a> Parser<'a> {
             0 => Ok(()),
             _ => Err(failure::err_msg("Failed to find closing character")),
         }
-    }
-
-    pub fn scan_for_set(&mut self, terms: &[&[u8]]) -> Option<usize> {
-        let rest = unsafe { std::str::from_utf8_unchecked(&self.source[self.cursor..]) };
-        terms
-            .iter()
-            .enumerate()
-            .filter_map(|(index, &term)| {
-                rest.find(unsafe { std::str::from_utf8_unchecked(term) })
-                    .map(|pos| (pos, index))
-            })
-            .min_by_key(|&(pos, _index)| pos)
-            .map(|(pos, index)| {
-                self.cursor += pos;
-                index
-            })
     }
 }

@@ -5,4 +5,7 @@ authors = ["Claire Harris <wishing.engine@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-failure = "*"
+failure = "~0.1.5"
+
+[dependencies.coffeegrains]
+path = "../coffeegrains"
