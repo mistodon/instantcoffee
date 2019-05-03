@@ -5,4 +5,7 @@ authors = ["***Realname*** ***Lastname*** <***redacted.email@redacted.nope***>"]
 edition = "2018"
 
 [dependencies]
-failure = "*"
+failure = "~0.1.5"
+
+[dependencies.coffeegrains]
+path = "../coffeegrains"
